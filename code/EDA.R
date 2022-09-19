@@ -9,6 +9,10 @@ metadata <- read_delim(file = "metadata_wu2011.txt")   # read in the metadata
 str(metadata)
 colnames(metadata)
 
+metadata2 <- metadata %>%  rename(sample.id = "#SampleID")   # rename the sample id 
+
+
+
 
 otu <- read_delim(file= "refseq-based_otutable_wu2011.txt") # read in refseq-based otu table 
 str(otu)
@@ -88,10 +92,50 @@ dim(otu_t_relative2_trim3)
 otu_t_relative2_trim3_long <- otu_t_relative2_trim3 %>% gather(taxa, prop, 2:179) # make a long table 
 head(otu_t_relative2_trim3_long)
 
-# bar plot without showing y-axis label ... 
+
+# bar plot to show each taxa per sample - without showing taxa name on the y-axis 
+ggplot(otu_t_relative2_trim3_long, 
+       aes(x=sample.id, 
+           y=prop, 
+           fill= taxa))+
+        geom_col(position = "fill")+
+        theme(axis.text.x=element_blank())+ # hide x-axis text 
+        theme(legend.position = "none") # hide legend 
+
+
+# inner join metadata2 and tidied otu table 
+meta.tidied_otu <- metadata2 %>% 
+        inner_join(otu_t_relative2_trim3_long, by="sample.id")  
+
+dim(meta.tidied_otu) 
+
+table(meta.tidied_otu$DIET) # number by diets 
 
 
 
+# export joined data set to processed data folder ... 
+
+getwd()
+
+write.csv(meta.tidied_otu, 
+          "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/meta.tidied_otu.csv", 
+          row.names = FALSE) 
+
+
+
+# modify the above bar plot sorting by diets 
+diet_plot <- ggplot(meta.tidied_otu,
+                    aes(x=sample.id, y=prop, fill=taxa))+
+        geom_col(position="fill")+
+        theme(legend.position = "none")+
+        theme(axis.text.x=element_blank())+
+        facet_grid(cols=vars(DIET), scales="free") # facet by diets with free scale 
+        
+ggsave("diet_plot.tiff", 
+       width = 5, height = 4,
+       path = "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/documentation")  
+
+ 
 
 
 
