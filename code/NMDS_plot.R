@@ -30,14 +30,25 @@ dim(otu_meta)
 com <- otu_meta[,2:179]  
 
 
-# turn data frame into matrix 
+# turn data frame into matrix [https://rpubs.com/CPEL/NMDS]
 m_com <- as.matrix(com)
+
+bc_dist_mat <- vegdist(m_com, method="bray")  # calculate bray-curtis distance 
+bc_dist_mat <- as.matrix(bc_dist_mat, labels=T) 
+write.csv(bc_dist_mat, "./processed_data/bc_dist_mat.csv") # write out bray-curtise matrix 
 
 
 # make community matrix  
 set.seed(1015)
-nmds <- metaMDS(m_com, distance = "bray") 
-nmds 
+
+nmds <- metaMDS(bc_dist_mat, 
+                distance = "bray",
+                k = 2,
+                maxit = 999,
+                trymax = 500,
+                wascores = TRUE)  
+
+nmds # stress 0.18 which is fair (some distances can be misleading for interpretation) 
 
 # extract NMDS scores (x and y coordinates) 
 data.scores <- as.data.frame(scores(nmds)) 
@@ -65,7 +76,7 @@ nmds_ellipse_plot <- ggplot(data.scores, aes(x=NMDS1, y=NMDS2, color = diet, fil
         geom_point(size =3, show.legend = TRUE)+
         stat_ellipse(geom = "polygon", type="norm", level=0.8, alpha=0.2, show.legend = FALSE)+
         #geom_richtext(...) 
-        coord_cartesian(xlim = c(-1.0, 1.0), ylim = c(-1.0, 1.0))+
+        coord_cartesian(xlim = c(-0.5, 0.5), ylim = c(-.5, .5))+
         labs(title = "Bray-Curtis dissimilarity \n between high- and low-fat groups",
              x= "NMDS Axis 1",
              y= "NMDS Axis 2")+
