@@ -13,11 +13,12 @@ otu_trimmed <- otu_trimmed[,-1] # remove repeated id column
 dim(otu_trimmed)
 
 # read in metadata 
-metadata <- read_delim(file = "metadata_wu2011.txt")   # read in the metadata 
+metadata <- read_delim(file = "./raw_data/metadata_wu2011.txt")   # read in the metadata 
 str(metadata)
 colnames(metadata) 
 
 metadata2 <- metadata %>%  rename(sample.id = "#SampleID")
+write.csv(metadata2, "./processed_data/metadata2.csv")
 
 
 # inner join meta-data and otu table 
@@ -29,12 +30,16 @@ dim(otu_meta)
 # extract only the abundance information 
 com <- otu_meta[,2:179]  
 
-
 # turn data frame into matrix [https://rpubs.com/CPEL/NMDS]
 m_com <- as.matrix(com)
+rownames(m_com)  <- otu_meta$sample.id # add row names 
+
 
 bc_dist_mat <- vegdist(m_com, method="bray")  # calculate bray-curtis distance 
 bc_dist_mat <- as.matrix(bc_dist_mat, labels=T) 
+
+rownames(bc_dist_mat)
+
 write.csv(bc_dist_mat, "./processed_data/bc_dist_mat.csv") # write out bray-curtise matrix 
 
 
