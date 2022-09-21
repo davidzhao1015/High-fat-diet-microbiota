@@ -4,146 +4,79 @@ library(readr) # package to read in any tabular data
 library(vegan)
 
 
+set.seed(1015)
+setwd("C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/raw_data")
+
+
 # READ IN RAW DATA 
-metadata <- read_delim(file = "metadata_wu2011.txt")   # read in the metadata 
+metadata <- read_delim(file = "./metadata_wu2011.txt")   # read in the metadata 
 str(metadata)
 colnames(metadata)
 
-metadata2 <- metadata %>%  rename(sample.id = "#SampleID")   # rename the sample id 
+metadata2 <- metadata %>%  
+        rename(sample.id = "#SampleID")   # rename the sample id 
 
 
-
-
-otu <- read_delim(file= "refseq-based_otutable_wu2011.txt") # read in refseq-based otu table 
-str(otu)
-head(otu)
-
+otu <- read_delim(file= "./refseq-based_otutable_wu2011.txt") # read in refseq-based otu table 
+dim(otu)
 otu_id <- otu[[1]]   # extract taxa 
-
 
 # PREPROCESS INPUT DATAFRAME 
 # transpose the otu table 
 otu_t <- data.frame(t(otu[,-1])) # flip row to column with base R function 
-head(otu_t)
 
-colnames(otu_t) <- otu_id # assign new column names as the taxa 
+colnames(otu_t) <- otu_id 
 
-colnames(otu_t) 
+otu_t$sample.id <- rownames(otu_t) 
 
+otu_t <- otu_t %>% select(sample.id, 1:361)  
 
-# full taxa seems too long as column labels. 
-# how to show only the name at the highest resolution?
-require(stringr)
+otu_t_long <- otu_t %>% gather("taxa", "count", 2:362) 
 
-otu_taxa_matrix <- str_split(otu_id, pattern = ";", simplify = TRUE)
-head(otu_taxa_matrix) 
-dim(otu_taxa_matrix)
+otu_t_long2 <- otu_t_long %>% 
+        separate(taxa, 
+                into=c("kingdom", "phylum", "class", "order", "family","genus","species","strain"), 
+                sep=";")
 
+# re-calculate relative abundance at phylum level 
+# check sequence counts in each sample - seems not equal 
+otu_t_long2 %>% 
+        group_by(sample.id) %>%
+        summarise(n=sum(count)) %>%
+        summary()
 
-dim(otu_t)  # 95 observations, 360 taxa 
+# add relative abundance for every otu 
+otu_t_long3 <- otu_t_long2 %>% 
+        group_by(sample.id) %>% 
+        mutate(total_count = sum(count)) %>% 
+        ungroup()
 
-# missing values ?
-sum(is.na(otu_t)) # no missingness 
+otu_t_long4 <- otu_t_long3 %>% 
+        mutate(rel_abundance = count/total_count) 
 
+otu_t_long4 %>% group_by(sample.id) %>% summarise(n=sum(rel_abundance)) %>% filter(n != 1)
 
-# calculate relative abundance across the row based on count numbers 
-sample.id <- rownames(otu_t) 
+# aggregate phylum count 
+agg_phylum_data <- otu_t_long4 %>%
+        group_by(sample.id, phylum) %>%
+        summarise(prop = sum(rel_abundance)) 
 
-otu_t_id <- cbind(sample.id, otu_t)  
+agg_phylum_data %>% 
+        group_by(phylum) %>% 
+        summarise(median = median(prop)) %>% 
+        arrange(desc(median))
 
-otu_t2 <- as.matrix(otu_t) 
+# aggregate genus count 
+agg_genus_data <- otu_t_long4 %>%
+        group_by(sample.id, genus) %>%
+        summarise(prop = sum(rel_abundance)) 
 
-otu_t_relative <- proportions(otu_t2, margin=1)   
-
-rowSums(otu_t_relative)
-
-
-otu_t_relative2 <- as.data.frame(otu_t_relative) 
-rownames(otu_t_relative2)
-
-
-# trim rare taxa with presence less than 10% or proportion lower than 0.1% in all samples 
-presence <- apply(otu_t_relative2, 2, function(x) mean(x !=0))
-sum(presence < 0.1)  # 181 rare taxa whereas 180 common taxa 
-
-rara_taxa <- names(presence)[c(which(presence <0.1))]   # store names of rare taxa 
-
-common_taxa <- names(presence)[c(which(presence >=0.1))] # store 180 common taxa 
-
-otu_t_relative2_trim  <- otu_t_relative2 %>% select(all_of(common_taxa)) 
-dim(otu_t_relative2_trim)  # done! 180 common taxa with 95 samples 
-
-
-
-low.prop <- apply(otu_t_relative2_trim, 2, function(x) sum(x <0.001)) # prop less than 0.1% in each sample 
-non.low.prop_taxa <- names(low.prop)[c(which(low.prop !=95))] # drop additional 2 rare taxa 
-
-otu_t_relative2_trim2 <- otu_t_relative2_trim %>% select(all_of(non.low.prop_taxa))  
-dim(otu_t_relative2_trim2) # done! 178 common taxa with 95 samples 
-
-head(otu_t_relative2_trim2) # df used for the following analysis 
+agg_genus_data %>% 
+        group_by(genus) %>% 
+        summarise(median = median(prop)) %>% 
+        arrange(desc(median))
 
 
-# reshape data frame 
-
-otu_t_relative2_trim3 <- cbind(sample.id, otu_t_relative2_trim2) # add sample id to the first column 
-dim(otu_t_relative2_trim3)
-
-otu_t_relative2_trim3_long <- otu_t_relative2_trim3 %>% gather(taxa, prop, 2:179) # make a long table 
-head(otu_t_relative2_trim3_long)
-
-
-# bar plot to show each taxa per sample - without showing taxa name on the y-axis 
-ggplot(otu_t_relative2_trim3_long, 
-       aes(x=sample.id, 
-           y=prop, 
-           fill= taxa))+
-        geom_col(position = "fill")+
-        theme(axis.text.x=element_blank())+ # hide x-axis text 
-        theme(legend.position = "none") # hide legend 
-
-
-# inner join metadata2 and tidied otu table 
-meta.tidied_otu <- metadata2 %>% 
-        inner_join(otu_t_relative2_trim3_long, by="sample.id")  
-
-dim(meta.tidied_otu) 
-
-table(meta.tidied_otu$DIET) # number by diets 
-
-
-
-# export joined data set to processed data folder ... 
-
-getwd()
-
-write.csv(meta.tidied_otu, 
-          "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/meta.tidied_otu.csv", 
-          row.names = FALSE) 
-
-
-
-# modify the above bar plot sorting by diets 
-diet_plot <- ggplot(meta.tidied_otu,
-                    aes(x=sample.id, y=prop, fill=taxa))+
-        geom_col(position="fill")+
-        theme(legend.position = "none")+
-        theme(axis.text.x=element_blank())+
-        facet_grid(cols=vars(DIET), scales="free") # facet by diets with free scale 
-        
-ggsave("diet_plot.tiff", 
-       width = 5, height = 4,
-       path = "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/documentation")  
-
- 
-
-
-
-
-
-
-
-
-
-
+write.csv(agg_genus_data, 
+          "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/agg_genus_data.csv")
 
