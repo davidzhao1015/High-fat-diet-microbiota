@@ -1,7 +1,6 @@
 library(vegan)
 library(tidyverse)
 
-
 # CC188 using the vegan r package to generate ecological distances avgdist() taking consideration of rarefaction  
 
 # CC189 (to watch) rarefying ecological distances with r: should you? 
@@ -12,12 +11,17 @@ library(tidyverse)
 # CC201 is richness estimation an alternative to rarefaction? trying breakaway and chao1 
 # CC202 how to find the best sampling depth for rarefaction 
 
-set.seed(19861015)
-
-add_genus_data <- read_csv("C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/agg_genus_data.csv")
 
 
-otu_raw <- read_delim("C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/raw_data/refseq-based_otutable_wu2011.txt")
+
+set.seed(19861015)  # ensure data analysis reproducibility  
+
+setwd("C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/") 
+
+
+# Read in OTU table 
+add_genus_data <- read_csv("processed_data/agg_genus_data.csv") 
+otu_raw <- read_delim("raw_data/refseq-based_otutable_wu2011.txt")
 
 otu_raw_t <- otu_raw %>% 
         t() %>%
@@ -34,7 +38,10 @@ otu_raw_t3 <- otu_raw_t2 %>%
         mutate(read_count = as.numeric(read_count))
 
 
-# library size per sample 
+
+# Library size per sample 
+# determine the minimal library size for rarefaction   
+
 min_librarysize <- otu_raw_t3 %>%
         mutate(sample_id =  factor(sample_id)) %>% # convert to factor variable 
         mutate(read_count = as.numeric(read_count)) %>% # convert to numeric variable 
@@ -45,24 +52,24 @@ min_librarysize <- otu_raw_t3 %>%
 
         pull(min)  # obtain the lowest library size for rarefaction  
         
-        
-# apply vegan functions to calculate alpha diversity with rarefaction  
+
+
+
+# Apply vegan functions to calculate alpha diversity with rarefaction  
 otu_raw_t3_df <- otu_raw_t3 %>% 
         spread(key= taxa, value = read_count, fill=0) %>% 
         as.data.frame() # prepare data frame for alpha diversity calculation 
 
-write.csv(otu_raw_t3_df,
-          "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/otutable_wide.csv")
+write.csv(otu_raw_t3_df, "processed_data/otutable_wide.csv")  # write out the data frame 
 
-
-
-alpha_rarefy <- vegan::rarefy(otu_raw_t3_df[,-1], sample=1814) 
+alpha_rarefy <- vegan::rarefy(otu_raw_t3_df[,-1], sample=1814) # calculate richness with rarefaction   
 
 alpha_rarefy_df <- data.frame(sample_id = otu_raw_t3_df[[1]],
-                              richness_rarefied =  alpha_rarefy) # richness with rarefaction based on vegan package 
+                              richness_rarefied =  alpha_rarefy) # convert to data frame   
 
 
-# calculate also different types of measurement for alpha diversity 
+
+# Calculate also different types of measurement for alpha diversity 
 alpha_multiple <- otu_raw_t3 %>% 
         group_by(sample_id) %>%
         summarise(sobs= specnumber(read_count),
@@ -74,45 +81,38 @@ alpha_multiple <- otu_raw_t3 %>%
         select(sample_id:invsimpson, richness_rarefied, read_count =n) %>%
         mutate(richness_rarefied = round(richness_rarefied, 0))
 
-write.csv(alpha_multiple, 
-          "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/alpha_multiple.csv")
+# write out the alpha-diversity data including rarefied richness
+write.csv(alpha_multiple, "processed_data/alpha_multiple.csv")  
 
 
-# beta diversity with rarefaction 
+
+
+# Beta diversity with rarefaction 
 otu_raw_t3_matrix <- as.matrix(otu_raw_t3_df[,-1])
 rownames(otu_raw_t3_matrix) <- otu_raw_t3_df[[1]]
 
-
+# use vegan::avgdist to calculate rarefied Bray-Curtis distance matrix with 
 beta_dist_rarefied <- avgdist(otu_raw_t3_matrix, 
                               dmethod = "bray", 
                               sample=min_librarysize)  
 
-beta_dist_rarefied_df <- beta_dist_rarefied %>% # bray-curtis with rarefaction 
+beta_dist_rarefied_df <- beta_dist_rarefied %>% 
         as.matrix() %>%
         as_tibble(rownames = "sample_id") %>%
         pivot_longer(-sample_id) %>% 
         filter(name < sample_id) # keep only the lower half 
 
+# write out the lower half of the distance matrix 
 write.csv(beta_dist_rarefied_df,
           "C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/beta_dist-matrix_rarefied.csv")
 
-
-# NMDS - CC187 by pat schloss 
 beta_dist_rarefied2 <- beta_dist_rarefied %>%
         as.matrix() %>% 
-        as_tibble(rownames = "sample_id")
+        as_tibble(rownames = "sample_id") # convert to tibble (alternative data frame)   
 
-nmds_bc <- metaMDS(beta_dist_rarefied) 
+# write out rarefied Bray-Curtis distance
+write.csv(beta_dist_rarefied2, "processed_data/beta_dist_rarefied_long.csv") 
 
-stress_bc <- nmds_bc$stress 
-
-metadata2 <- read_csv("~/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/processed_data/metadata2.csv")
-
-scores(nmds_bc) %>%
-        as_tibble(rownames = "sample.id") %>%
-        inner_join(., metadata2, by="sample.id") %>%
-        ggplot(aes(x=NMDS1, y=NMDS2, color=DIET)) +
-        geom_point()
 
 
 
