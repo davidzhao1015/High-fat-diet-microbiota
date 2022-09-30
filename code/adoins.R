@@ -5,33 +5,43 @@ library(vegan)
 library(ggtext)
 
 
-set.seed(1015)
+
+# Ensure analysis is reproducible
+set.seed(19861015)
+
+# Set permutation parameter 
 permutation <- 1000 
 
+# Change working directory 
+setwd("C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/") 
 
-# read in bray-curtis distance matrix 
 
-dist <- read_csv("./processed_data/bc_dist_mat.csv",
-                 skip=1,
-                 col_names = FALSE)  
 
-colnames(dist) <- c("sample.id", dist$X1)
 
-# read in the meta-data 
-meta <- read_csv("./processed_data/metadata2.csv")
+# Read in Bray-Curtis distance matrix with rarefaction 
+bc_dist_rare <- read_csv("processed_data/beta_dist_rarefied_long.csv") %>%
+        select(-1) # drop the first column (index)
 
-dist_meta <- inner_join(dist, meta, by="sample.id")  
+# Read in the meta data 
+meta <- read_csv("processed_data/metadata2.csv")  %>% 
+        rename(sample_id = sample.id)
 
+# join distance matrix and metadata 
+dist_meta <- inner_join(bc_dist_rare, 
+                        meta, 
+                        by="sample_id")   
+
+# convert to dist data 
 all_dist <- dist_meta %>%
-        select(all_of(.[["sample.id"]])) %>% 
+        select(all_of(.[["sample_id"]])) %>% 
         as.dist() 
 
 
-# test center variation between two groups with adonis 
+
+# Hypothesis testing to compare centers by two diet groups using vegan::adonis   
 adonis_test <- adonis(all_dist~DIET,
                       data = dist_meta,
                       permutations = permutation)
-
 
 p.val_diet <- adonis_test[["aov.tab"]][["Pr(>F)"]][1]  # significant different at 0.05 level  
 
