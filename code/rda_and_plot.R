@@ -28,14 +28,13 @@ set.seed(19861015)
 # scaling type I and II plots 
 
 
-$# Ref 1) Book, Statistical analysis of microbiome data with R; 
+# Ref 1) Book, Statistical analysis of microbiome data with R; 
 # 2) https://r.qcbs.ca/workshop10/book-en/redundancy-analysis.html 
 
 
 
 
-
-# step 0. load example data for the following analysis 
+# step 1. load example data for the following analysis 
 data("throat.otu.tab") # load otu count data from GUniFrac package 
 data("throat.meta") # load meta data 
  
@@ -43,53 +42,74 @@ throat_meta <- throat.meta %>%
         select(SmokingStatus, Age, Sex, PackYears) 
 
  
-# step 1. transform otu count data with Hellinger method 
+# step 2. transform otu count data with Hellinger method 
 otu_hell <- decostand(throat.otu.tab, "hell")   
 
 
 
-# step 2. implement RDA between otu and the explanatory variable, diet 
+# step 3. implement RDA between otu and the explanatory variable, diet 
 rda_out_hell <- rda(otu_hell ~ ., throat_meta)  
 
 summary(rda_out_hell)
 rda_out_hell  # print output  - constrained axis explain about 4.8% variation of community data 
 
 
+# step 4. forward selection to reduce the number of variables entering the analysis 
+# two alternative functions of vegan can do this job, including ordistep() and ordiR2step 
 
-# step 3. look up canonical coefficients (equivalent of regression coefficients) of 
+step_forward <- ordistep(rda(otu_hell ~ 1, data=throat_meta),
+                         scope = formula(rda_out_hell),
+                         direction = "forward",
+                         pstep=1000)  # SmokingStatus, Sex 
+
+# alternative method 
+step_forwad2 <- ordiR2step(rda(otu_hell ~1, data=throat_meta),
+                           scope = formula(rda_out_hell),
+                           direction = "forward",
+                           pstep = 1000) # SmokingStatus
+
+
+
+# step 5. final model including PackYear and sex 
+rda_final <- rda(otu_hell ~ SmokingStatus + Sex, data = throat_meta) 
+
+RsquareAdj(rda_final)  # adjusted R^2 = 4.5% 
+
+anova(rda_final, step =1000)  # significance of global model 
+
+anova(rda_final, by="axis", step = 1000)  # sig. for axis 
+
+anova(rda_final, by = "term", step = 1000) # sig. for explanatory variables  
+
+
+# step 6. look up canonical coefficients (equivalent of regression coefficients) of 
 # each explanatory variable on each canonical axis 
-coef(rda_out_hell) 
+coef(rda_final) 
+
+
+# step 7. apply Kaiser-Guttman criterion to residual axes 
+rda_final$CA$eig >= mean(rda_final$CA$eig)
 
 
 
-# step 4. look up R^2 and adj R^2 
-RsquareAdj(rda_out_hell)  
-# adj R^2 is negative meaning that explanatory variables explain less variation than 
-# the same number of randomly generate variables 
 
-
-
-# step 5. apply Kaiser-Guttman criterion to residual axes 
-rda_out_hell$CA$eig >= mean(rda_out_hell$CA$eig)
-
-
-# step 6. plot the results  of RDA 
-ordiplot(rda_out_hell, scaling = 1, type="text")  # distances among objects reflect their similarity 
-ordiplot(rda_out_hell, scaling = 2, type = "text") # angles between variables reflect their correlation 
+# step 8. plot the results  of RDA 
+ordiplot(rda_final, scaling = 1, type="text")  # distances among objects reflect their similarity 
+ordiplot(rda_final, scaling = 2, type = "text") # angles between variables reflect their correlation 
 
 # customize RDA plot with ggplot2 
 ## extract % explained by the first 2 axes 
-perc <- round(100*(summary(rda_out_hell)$cont$importance[2, 1:2]),2)   
+perc <- round(100*(summary(rda_final)$cont$importance[2, 1:2]),2)   
 
 ## extract scores - these are coordination in the RDA space 
-sc_samples <- scores(rda_out_hell, display = "sites", choices = c(1,2), scaling =1) 
+sc_samples <- scores(rda_final, display = "sites", choices = c(1,2), scaling =1) 
 
-sc_otu <- scores(rda_out_hell, display = "species", choices = c(1,2), scaling =1) 
+sc_otu <- scores(rda_final, display = "species", choices = c(1,2), scaling =1) 
 
-sc_exp <- scores(rda_out_hell, display = "bp", choices = c(1,2), scaling = 1)  
+sc_exp <- scores(rda_final, display = "bp", choices = c(1,2), scaling = 1)  
 
 
-plot(rda_out_hell,
+plot(rda_final,
      scaling = 1, # set scaling type 
      type = "none", # this excludes the plotting of any points from the results
      frame = FALSE,
@@ -131,45 +151,6 @@ text(x = sc_exp[,1] -0.1, # adjust text coordinate to avoid overlap with arrow t
      col = "red", 
      cex = 1, 
      font = 2)
-
-
-
-
-# step 7. permutation to test significance of variations in response variables explained by exploratory variables 
-anova.cca(rda_out_hell, step = 1000)  # permutation test on the global model 
-anova.cca(rda_out_hell, by="axis", step=1000) # test on axis 
-anova.cca(rda_out_hell, by = "terms", step =1000) # test on explanatory variable  
-
-
-# step 8. forward selection to reduce the number of variables entering the analysis 
-# two alternative functions of vegan can do this job, including ordistep() and ordiR2step 
-
-step_forward <- ordistep(rda(otu_hell ~ 1, data=throat_meta),
-                         scope = formula(rda_out_hell),
-                         direction = "forward",
-                         pstep=1000)   # select Sex and PackYears  
-
-
-
-# alternative method 
-step_forwad2 <- ordiR2step(rda(otu_hell ~1, data=throat_meta),
-                           scope = formula(rda_out_hell),
-                           direction = "forward",
-                           pstep = 1000) 
-
-
-
-# step 9. final model including PackYear and sex 
-rda_final <- rda(otu_hell ~ SmokingStatus + Sex, data = throat_meta) 
-RsquareAdj(rda_final)
-
-
-anova(rda_final, step =1000)  # significance of global model 
-
-anova(rda_final, by="axis", step = 1000)  # sig. for axis 
-
-anova(rda_final, by = "term", step = 1000) # sig. for explanatory variables  
-
 
 
 
