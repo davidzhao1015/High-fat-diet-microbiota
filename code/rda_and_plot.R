@@ -3,11 +3,11 @@ library(vegan)
 library(GUniFrac)
 
 
-# redundancy analysis (RDA) 
+# Redundancy Analysis (RDA) + partial RDA  
+
 # RDA extract and summarize variation in a set of response variables that can be explained by a set of explanatory
 # variables, namely a direct gradient analysis. 
 # RDA is considered as a constrained version of PCA 
-
 
 # Ref: 
 # 1) Book: Statistical analysis of microbiome data with R; 
@@ -16,10 +16,9 @@ library(GUniFrac)
 
 
 
-
 setwd("C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/")
 
-set.seed(19861015)
+set.seed(19861015)  
 
 
 # step 1. load example data for the following analysis 
@@ -28,6 +27,7 @@ data("throat.meta") # load meta data
  
 throat_meta <- throat.meta %>% 
         select(SmokingStatus, Age, Sex, PackYears) 
+
 
 
  
@@ -39,6 +39,12 @@ throat_meta <- throat.meta %>%
 
 otu_hell <- decostand(throat.otu.tab, "hell")   
 
+# standardize quantitative explanatory data 
+throat_meta$Age <- decostand(throat_meta$Age, method = "standardize")
+
+throat_meta$PackYears <- decostand(throat_meta$PackYears, method = "standardize") 
+
+
 
 
 # step 3. implement RDA between otu and the explanatory variable, diet 
@@ -46,6 +52,7 @@ rda_out_hell <- rda(otu_hell ~ ., throat_meta)
 
 summary(rda_out_hell)
 rda_out_hell  # print output  - constrained axis explain about 4.8% variation of community data 
+
 
 
 
@@ -65,22 +72,25 @@ step_forwad2 <- ordiR2step(rda(otu_hell ~1, data=throat_meta),
 
 
 
+
+
 # step 5. final model including PackYear and sex 
 rda_final <- rda(otu_hell ~ SmokingStatus + Sex, data = throat_meta) 
 
-
-
 # what is the model's explanatory power?  
-RsquareAdj(rda_final)  # adjusted R^2 = 4.5% 
-
-
+RsquareAdj(rda_final)$adj.r.squared  # adjusted R^2 = 4.4% 
+# adjusted R^2 measures the strength of the relationship between response and explanatory variables, but applies 
+# a correction of the R^2 to take into account the number of explanatory variables. This is the statistic that 
+# should be reported. 
 
 # is the model statistically significant? Yes, p=0.001 
-anova(rda_final, step =1000)  # significance of global model 
+anova.cca(rda_final, step =1000)  # significance of global model 
 
-anova(rda_final, by="axis", step = 1000)  # sig. for axis 
+anova.cca(rda_final, by="axis", step = 1000)  # sig. for axis 
 
-anova(rda_final, by = "term", step = 1000) # sig. for explanatory variables  
+anova.cca(rda_final, by = "term", step = 1000) # sig. for explanatory variables  
+
+
 
 
 
@@ -89,7 +99,6 @@ anova(rda_final, by = "term", step = 1000) # sig. for explanatory variables
 # the effects of more interesting explanatory variables 
 
 ## focus on effect of SmokingStatus controlling for rest covariables including Sex, Age and PackYears 
-
 
 # method 1: subset explanatory (environmental) variables into SmokingStatus and covariables 
 env.smoke <- subset(throat_meta, select=c(SmokingStatus)) 
@@ -103,8 +112,7 @@ summary(pRDA)
 
 RsquareAdj(pRDA)$adj.r.squared  # explanatory power is 1.1% 
 
-anova.cca(pRDA, step = 1000)  # the model is statistically significant with p = 0.043 
-
+anova.cca(pRDA, step = 1000)  # the model is statistically significant with p = 0.05  
 
 # method 2: alternative syntax 
 pRDA2 <- rda(otu_hell~ SmokingStatus +  # effect of interest 
@@ -123,21 +131,15 @@ coef(rda_final)
 
 
 
-
-
 # step 7. apply Kaiser-Guttman criterion to residual axes 
 rda_final$CA$eig >= mean(rda_final$CA$eig)
-
-
-
 
 
 
 # step 8. plot the results  of RDA 
 ## default/ quick plot 
 ordiplot(rda_final, scaling = 1, type="text")  # distances among objects reflect their similarity 
-ordiplot(rda_final, scaling = 2, type = "text") # angles between variables reflect their correlation 
-
+ordiplot(rda_final, scaling = 2, type = "points") # angles between variables reflect their correlation 
 
 
 # customize RDA plot with ggplot2 
