@@ -8,30 +8,18 @@ library(GUniFrac)
 # variables, namely a direct gradient analysis. 
 # RDA is considered as a constrained version of PCA 
 
+
+# Ref: 
+# 1) Book: Statistical analysis of microbiome data with R; 
+# 2) https://r.qcbs.ca/workshop10/book-en/redundancy-analysis.html 
+# 3) partial RDA https://r.qcbs.ca/workshop10/book-en/partial-redundancy-analysis.html 
+
+
+
+
 setwd("C:/Users/17803/Documents/RStuodio-link-GitHub/Wu_2011_MLRepo/High-fat-diet-microbiota/")
 
 set.seed(19861015)
-
-
-
-# pre-analysis 
-# standardize response variables and explanatory variables if they are not dimentionally homogeneous 
-# turn qualitative variable to dummy variables 
-# examine distribution of response and explanatory variables, and apply transformation when needed 
-# non-Euclidean distance matrix (eg. Hellinger distance) is applicable to RDA  
-
-
-# total variance = constrained and unconstrained variance  
-# scores of response and explanatory variables 
-# examine non-canonical (unconstrained) vectors of RDA solution by ordination and correlation, resulting in 
-# insights into the behavior of these residuals 
-# scaling type I and II plots 
-
-
-# Ref 1) Book, Statistical analysis of microbiome data with R; 
-# 2) https://r.qcbs.ca/workshop10/book-en/redundancy-analysis.html 
-
-
 
 
 # step 1. load example data for the following analysis 
@@ -41,8 +29,14 @@ data("throat.meta") # load meta data
 throat_meta <- throat.meta %>% 
         select(SmokingStatus, Age, Sex, PackYears) 
 
+
  
 # step 2. transform otu count data with Hellinger method 
+# standardize response variables and explanatory variables if they are not dimentionally homogeneous 
+# turn qualitative variable to dummy variables 
+# examine distribution of response and explanatory variables, and apply transformation when needed 
+# non-Euclidean distance matrix (eg. Hellinger distance) is applicable to RDA  
+
 otu_hell <- decostand(throat.otu.tab, "hell")   
 
 
@@ -52,6 +46,7 @@ rda_out_hell <- rda(otu_hell ~ ., throat_meta)
 
 summary(rda_out_hell)
 rda_out_hell  # print output  - constrained axis explain about 4.8% variation of community data 
+
 
 
 # step 4. forward selection to reduce the number of variables entering the analysis 
@@ -73,8 +68,14 @@ step_forwad2 <- ordiR2step(rda(otu_hell ~1, data=throat_meta),
 # step 5. final model including PackYear and sex 
 rda_final <- rda(otu_hell ~ SmokingStatus + Sex, data = throat_meta) 
 
+
+
+# what is the model's explanatory power?  
 RsquareAdj(rda_final)  # adjusted R^2 = 4.5% 
 
+
+
+# is the model statistically significant? Yes, p=0.001 
 anova(rda_final, step =1000)  # significance of global model 
 
 anova(rda_final, by="axis", step = 1000)  # sig. for axis 
@@ -82,9 +83,46 @@ anova(rda_final, by="axis", step = 1000)  # sig. for axis
 anova(rda_final, by = "term", step = 1000) # sig. for explanatory variables  
 
 
+
+# partial RDA (pRDA): remove the effect of one or more explanatory variables on a set of response variables 
+# prior to a standard RDA. This may be useful when well-characterized variables with strong effects obscure 
+# the effects of more interesting explanatory variables 
+
+## focus on effect of SmokingStatus controlling for rest covariables including Sex, Age and PackYears 
+
+
+# method 1: subset explanatory (environmental) variables into SmokingStatus and covariables 
+env.smoke <- subset(throat_meta, select=c(SmokingStatus)) 
+env.covariables <- subset(throat_meta, select = c(-SmokingStatus)) 
+
+pRDA <- rda(X=otu_hell, Y=env.smoke, Z=env.covariables)
+summary(pRDA) 
+# interpretation: smoking status (constrained proportion) explains 2.6% of the variation in bacterial community 
+# composition across fecal samples, while covariables (conditioned proportion) explains 7.8% of this variation. In
+# addition, unexplained variation in bacterial community across fecal samples reaches 89.6%. 
+
+RsquareAdj(pRDA)$adj.r.squared  # explanatory power is 1.1% 
+
+anova.cca(pRDA, step = 1000)  # the model is statistically significant with p = 0.043 
+
+
+# method 2: alternative syntax 
+pRDA2 <- rda(otu_hell~ SmokingStatus +  # effect of interest 
+                     Condition(Sex + Age + PackYears),  # effect to control 
+             data = throat_meta) 
+
+summary(pRDA2) 
+
+
+
+
+
 # step 6. look up canonical coefficients (equivalent of regression coefficients) of 
 # each explanatory variable on each canonical axis 
 coef(rda_final) 
+
+
+
 
 
 # step 7. apply Kaiser-Guttman criterion to residual axes 
@@ -93,9 +131,14 @@ rda_final$CA$eig >= mean(rda_final$CA$eig)
 
 
 
+
+
 # step 8. plot the results  of RDA 
+## default/ quick plot 
 ordiplot(rda_final, scaling = 1, type="text")  # distances among objects reflect their similarity 
 ordiplot(rda_final, scaling = 2, type = "text") # angles between variables reflect their correlation 
+
+
 
 # customize RDA plot with ggplot2 
 ## extract % explained by the first 2 axes 
