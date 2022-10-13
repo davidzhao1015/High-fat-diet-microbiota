@@ -10,7 +10,7 @@ library(broom)
 # Permutation Multivariate Analysis of Variance (PERMANOVA) with adonis() [adonis2() may be the upgraded version?] 
 # in vegan package 
 
-# Ref. 
+# Ref
 # 1) minimalR by Dr. Patrick Schloss
 # 2) Paper: Application of multivariate statistical techniques in microbial ecology 
 # 3) Chap 9 - Book: Statistical analysis of microbiome data with R  
