@@ -117,5 +117,13 @@ adonis_group4_contr.poly$aov.tab # groups explain about 26.6% with p=0.0010
 
 
 
+# pairwise permutation MANOVA using RVAideMemoire package [see p.297-301 Ref(3)]
+
+
+
+# evaluate group homogeneity using betadisper() [see p.301-304 Ref(3)]
+
+
+
 
 
