@@ -110,7 +110,7 @@ adonis_group4_contr.poly <- adonis(all_dist~diet_sex,
                                    contr.unordered = "contr.sum",  # not quite sure this argument ... 
                                    contr.ordered = "contr.poly") # not quite sure this argument ... 
 
-adonis_group4_contr.poly$aov.tab # groups explain about 26.6% with p=0.001  
+adonis_group4_contr.poly$aov.tab # groups explain about 26.6% with p=0.0010 
 
 
 
