@@ -124,6 +124,8 @@ adonis_group4_contr.poly$aov.tab # groups explain about 26.6% with p=0.0010
 # evaluate group homogeneity using betadisper() [see p.301-304 Ref(3)]
 
 
+# 
+
 
 
 
