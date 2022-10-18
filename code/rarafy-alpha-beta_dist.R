@@ -98,7 +98,7 @@ beta_dist_rarefied2 <- beta_dist_rarefied %>%
         as_tibble(rownames = "sample_id") # convert to tibble (alternative data frame)   
 
 # write out rarefied Bray-Curtis distance
-write.csv(beta_dist_rarefied2, "processed_data/beta_dist_rarefied_long.csv") 
+write.csv(beta_dist_rarefied2, "processed_data/beta_dist_rarefied_wide.csv")  
 
 
 
